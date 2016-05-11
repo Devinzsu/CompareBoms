@@ -19,6 +19,8 @@ class compareTwoBOMs():
         self.secondBom=self.ExtractInfoFromExcel(self.secondBOMExcel)
         self.primaryRiskBuyBom=self.BomStruct(self.primaryRiskbuyExcel)
     def compareBoms(self,first,second):
+        first=self.primaryBom
+        second=self.secondBom
         refDes1=first[4].index("Ref Des")
         partNum=second[4].index("Number")
         changelist=[]
@@ -38,7 +40,8 @@ class compareTwoBOMs():
         list310=self.primaryBom
         print("finish")
         #print(list[4])
-        excelfile=xlsxwriter.Workbook("test.xls")
+        altcomponents=self.findAltComponents()
+        excelfile=xlsxwriter.Workbook(excel)
         sheet1=excelfile.add_worksheet()
         for row in range(len(list)):        
             for col in range(len(list[row])):
@@ -47,24 +50,27 @@ class compareTwoBOMs():
         excelfile.close()
         excelfile1=xlsxwriter.Workbook(excel)
         sheet1_excel1=excelfile1.add_worksheet()
+        sheet1_excel1.set_column(0, 5, 20)
         
         difflist=self.compareBoms(list310, list)
         difflist1=self.compareBoms(list,list310)  
         #print(difflist)
         sheet1_excel1.write_row(0, 0, ["Updated components"])  
-        sheet1_excel1.write_row(1, 0, ["Ref Des","New NVPN","Description","Old NVPN","Description"])
+        sheet1_excel1.write_row(1, 0, ["Ref Des","New NVPN","Description",
+                                       "Old NVPN","Description","Notes"])
+        sheet1_excel1.autofilter(1,0,len(difflist[0]),5)
         count=2
         #print(len(difflist))
         for each in difflist[0]:        
             #sheet1_excel1.write(count,0,k)
             for (k,v) in each.items():
-                #print(k,v)
-                
                 sheet1_excel1.write(count,0,k)
-                sheet1_excel1.write(count,1,v[0])
-                sheet1_excel1.write(count,2,v[1])
-                sheet1_excel1.write(count,3,v[2])
-                sheet1_excel1.write(count,4,v[3])
+                if v[0] in altcomponents:
+                    temp=v+["Alt Component"]
+                    print(temp)
+                    sheet1_excel1.write_row(count,1,temp)
+                else:
+                    sheet1_excel1.write_row(count,1,v)
                 count=count+1
         count=0
         sheet1_add=excelfile1.add_worksheet("added")
@@ -72,13 +78,11 @@ class compareTwoBOMs():
         sheet1_add.write_row(count+2, 0,  ["Ref Des","New NVPN","Description"])
         count=count+3
         for each in difflist[1]:        
-            #sheet1_excel1.write(count,0,k)
             for (k,v) in each.items():
-                #print(k,v)
-                
                 sheet1_add.write(count,0,k)
-                sheet1_add.write(count,1,v[0])
-                sheet1_add.write(count,2,v[1])
+                sheet1_add.write_row(count,1,v)
+                if v[0] in altcomponents:
+                    sheet1_add.write(count,1+len(v),"Alt Component")
                 count=count+1
         count=0
         sheet1_remove=excelfile1.add_worksheet("removed")
@@ -86,16 +90,15 @@ class compareTwoBOMs():
         sheet1_remove.write_row(count+2, 0,  ["Ref Des","New NVPN","Description"])
         count=count+3
         for each in difflist1[1]:        
-            #sheet1_excel1.write(count,0,k)
             for (k,v) in each.items():
-                #print(k,v)
-                
                 sheet1_remove.write(count,0,k)
-                sheet1_remove.write(count,1,v[0])
-                sheet1_remove.write(count,2,v[1])
-    
+                sheet1_remove.write_row(count,1,v)
+                if v[0] in altcomponents:
+                    sheet1_remove.write(count,1+len(v),"Alt Component")
                 count=count+1
-        
+        excelfile.close()
+    def removePrimaryComponents(self,complist):
+        resultList=[]      
     def ExtractInfoFromExcel(self,excelPath):
         excfile=xlrd.open_workbook(filename=excelPath,encoding_override='utf-8')
         worksheet=excfile.sheet_by_index(0)
@@ -145,23 +148,7 @@ class compareTwoBOMs():
                     bomstruct[str(list[each][0])]=[str(list[each][2])]
                 else:
                     bomstruct[str(list[each][0])].append(str(list[each][2]))
-        return [bomstruct,list]
-    def compareBoms(self,firstBom,secondBom):
-        refDes1=firstBom[4].index("Ref Des")
-        partNum=secondBom[4].index("Number")
-        changelist=[]
-        addedlist=[]
-        for index in range(len(firstBom)):
-            components=firstBom[index][partNum]
-            if re.search("\d+-\d+-\d+", str(components)) and len(firstBom[index][refDes1])>=1:
-                temp=self.findCompont(firstBom[index], secondBom)
-                changelist.append(temp[0])
-                addedlist.append(temp[1])
-                #print(difflist)
-                #then, find the component in second BOM
-                #print(firstBom[index])
-            
-        return [changelist,addedlist]#print(components)
+        return list
     def findCompont(self,component, secondBom):
         refDes=secondBom[4].index("Ref Des")
         partNum=secondBom[4].index("Number")
@@ -171,15 +158,9 @@ class compareTwoBOMs():
         list=[]
         partlist={}
         addedlist={}
-        #print(component[refDes])
-        #print(sourceComponent)
         for eachCompoent in sourceComponent:
-            #print(eachCompoent)
             list.append(eachCompoent)
             if eachCompoent is not None and len(eachCompoent)>1:
-                #print(eachCompoent)
-    #             if component[partNum]=="195-3223-000":
-    #                 print(component)
                 for index in range(len(secondBom)):
                     targetComponent=secondBom[index][refDes]
                     targetlist=targetComponent.replace(" ",'').split(",")
@@ -187,24 +168,49 @@ class compareTwoBOMs():
                         if eachCompoent in list:
                             list.remove(eachCompoent)
                         if(component[partNum]==secondBom[index][partNum]):
-                            #if eachCompoent=="Q1":
-                                #print("test",secondBom[index],targetlist)
-                            #if eachCompoent in list:
-                                #print("Exit",secondBom[index])
-                                #print(sourceComponent)
-                                #print(str(eachCompoent),targetComponent)
-                            #list.append(eachCompoent)
-                            if eachCompoent in list:
-                                list.remove(eachCompoent)
+                            if eachCompoent in partlist:
+                                count=0;
+                                #partlist.pop(eachCompoent)
                         elif (component[partNum]!=secondBom[index][partNum]):
-                            partlist[eachCompoent]=[component[partNum],component[indexOfdesc],secondBom[index][partNum],secondBom[index][indexOfdesc]]
+                            #print(component)
+                            #print(component[7])
+                            if re.match("\d+", str(component[7])) and int(component[7])>0:
+                                #print(component[7])
+                                partlist[eachCompoent]=[component[partNum],
+                                                       component[indexOfdesc],
+                                                       secondBom[index][partNum],
+                                                       secondBom[index][indexOfdesc]
+                                                       ]
+                            else:
+                                partlist[eachCompoent]=[component[partNum],
+                                                        component[indexOfdesc],
+                                                        secondBom[index][partNum],
+                                                        secondBom[index][indexOfdesc]]
+                            #partlist[eachCompoent]=[component[partNum],component[indexOfdesc],secondBom[index][partNum],secondBom[index][indexOfdesc]]
                 if(len(list)>=1 and list[0]!=''):
                     addedlist[eachCompoent]=[component[partNum],component[indexOfdesc]]
-        if(len(list)>=1 and list[0]!=''):
-            print("%s not exist"%list)
+
         return [partlist,addedlist]
         
-
+    def findAltComponents(self):
+        altClist=[]
+        allAltlist=[]
+        #print(self.primaryRiskBuyBom)
+        #print(len(self.primaryRiskBuyBom))
+        for index in range(len(self.primaryRiskBuyBom)):
+            if self.primaryRiskBuyBom[index][9]=="False":
+                #print(self.primaryRiskBuyBom[index][0],self.primaryRiskBuyBom[index][1])
+                altClist.append(self.primaryRiskBuyBom[index][2])
+        for altIndex in range(len(altClist)):
+            partnumber=altClist[altIndex]
+            #print(partnumber)
+            for each in range(len(self.primaryRiskBuyBom)):
+                if re.search("\d+-\d+-\d+-\d+", str(self.primaryRiskBuyBom[each][0])):
+                    #print(self.primaryRiskBuyBom[each][0])
+                    if (self.primaryRiskBuyBom[each][0])==str(partnumber):
+                        allAltlist.append(self.primaryRiskBuyBom[each][2])
+        return altClist+allAltlist
+            
 def ExtractInfoFromExcel(location):
     excfile=xlrd.open_workbook(filename=location,encoding_override='utf-8')
     worksheet=excfile.sheet_by_index(0)
@@ -217,13 +223,11 @@ def ExtractInfoFromExcel(location):
            data=[]
            for each in range(len(row)):
                try:
-                   #print(row[each])
                    data.append(row[each])
                except UnicodeEncodeError:
                    slashUStr=row[each]
                    decodedstr=codecs.decode(slashUStr,"unicode-escape" )
                    decodedstrtoGBK=decodedstr.encode("GBK","ignore")
-                   #print(decodedstrtoGBK)
                    data.append(decodedstrtoGBK)
            list.append(data)
     return list

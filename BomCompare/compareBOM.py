@@ -51,7 +51,21 @@ def findCompont(component, secondBom):
                         if eachCompoent in list:
                             list.remove(eachCompoent)
                     elif (component[partNum]!=secondBom[index][partNum]):
-                        partlist[eachCompoent]=[component[partNum],component[indexOfdesc],secondBom[index][partNum],secondBom[index][indexOfdesc]]
+                        if int(component[index][8])!=0:
+                           partlist[eachCompoent]=[component[partNum],
+                                                   component[indexOfdesc],
+                                                   secondBom[index][partNum],
+                                                   secondBom[index][indexOfdesc],
+                                                   "Alt component"]
+                           
+                        else:
+                           partlist[eachCompoent]=[component[partNum],
+                                                   component[indexOfdesc],
+                                                   secondBom[index][partNum],
+                                                   secondBom[index][indexOfdesc]]
+                            
+                        
+                        
             if(len(list)>=1 and list[0]!=''):
                 addedlist[eachCompoent]=[component[partNum],component[indexOfdesc]]
 
